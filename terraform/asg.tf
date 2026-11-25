@@ -7,6 +7,10 @@ resource "aws_launch_template" "app" {
   image_id      = data.aws_ssm_parameter.al2023_ami.value
   instance_type = var.instance_type
 
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_monitor.name
+  }
+
   # Monitoreo detallado (1 minuto) para que las alarmas de Auto Scaling respondan rápido
   monitoring {
     enabled = true
@@ -26,6 +30,11 @@ resource "aws_launch_template" "app" {
   user_data = base64encode(templatefile("${path.module}/user_data.sh", {
     server_py_gz_b64  = base64gzip(file("${path.module}/../app/server.py"))
     index_html_gz_b64 = base64gzip(file("${path.module}/../app/index.html"))
+    aws_region        = var.aws_region
+    asg_name          = "${var.project_name}-asg"
+    high_alarm_name   = "${var.project_name}-high-cpu"
+    low_alarm_name    = "${var.project_name}-low-cpu"
+    target_group_arn  = aws_lb_target_group.app.arn
   }))
 
   tag_specifications {

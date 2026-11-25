@@ -102,6 +102,14 @@ resource "aws_security_group" "ec2" {
     security_groups = [aws_security_group.alb.id]
   }
 
+  ingress {
+    description = "HTTP interno entre instancias del ASG para propagar estres y monitoreo"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    self        = true
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

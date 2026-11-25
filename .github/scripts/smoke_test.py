@@ -78,7 +78,18 @@ def main():
         delay_sec=5,
     )
 
-    if ok_html and ok_health and ok_whoami:
+    ok_cluster = check_url(
+        "Endpoint Cluster Monitor (ASG + CloudWatch)",
+        f"{base}/api/cluster",
+        lambda b: (
+            "asg" in json.loads(b) and "instances" in json.loads(b),
+            f"Cluster OK (instancias: {len(json.loads(b).get('instances', []))})",
+        ),
+        max_retries=10,
+        delay_sec=5,
+    )
+
+    if ok_html and ok_health and ok_whoami and ok_cluster:
         print("\n🎉 ¡DESPLIEGUE VERIFICADO EXITOSAMENTE!")
         sys.exit(0)
     sys.exit(1)

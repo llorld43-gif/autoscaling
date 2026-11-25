@@ -2,7 +2,8 @@
 set -euxo pipefail
 
 dnf update -y
-dnf install -y nginx python3 gzip
+dnf install -y nginx python3 gzip python3-pip
+pip3 install --no-cache-dir boto3 || dnf install -y python3-boto3
 
 mkdir -p /opt/asg-demo
 
@@ -30,7 +31,12 @@ cat <<EOF > /opt/asg-demo/meta.json
   "instance_id": "$${INSTANCE_ID}",
   "az": "$${AZ}",
   "private_ip": "$${PRIVATE_IP}",
-  "instance_type": "$${INSTANCE_TYPE}"
+  "instance_type": "$${INSTANCE_TYPE}",
+  "region": "${aws_region}",
+  "asg_name": "${asg_name}",
+  "high_alarm": "${high_alarm_name}",
+  "low_alarm": "${low_alarm_name}",
+  "target_group_arn": "${target_group_arn}"
 }
 EOF
 
