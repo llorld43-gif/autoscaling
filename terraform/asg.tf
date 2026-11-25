@@ -23,7 +23,10 @@ resource "aws_launch_template" "app" {
     security_groups             = [aws_security_group.ec2.id]
   }
 
-  user_data = base64encode(file("${path.module}/user_data.sh"))
+  user_data = base64encode(templatefile("${path.module}/user_data.sh", {
+    server_py_gz_b64  = base64gzip(file("${path.module}/../app/server.py"))
+    index_html_gz_b64 = base64gzip(file("${path.module}/../app/index.html"))
+  }))
 
   tag_specifications {
     resource_type = "instance"
