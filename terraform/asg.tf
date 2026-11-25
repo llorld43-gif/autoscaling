@@ -38,14 +38,13 @@ resource "aws_launch_template" "app" {
   }
 
   user_data = base64encode(templatefile("${path.module}/user_data.sh", {
-    server_py_gz_b64  = base64gzip(file("${path.module}/../app/server.py"))
-    index_html_gz_b64 = base64gzip(file("${path.module}/../app/index.html"))
-    aws_region        = var.aws_region
-    asg_name          = "${var.project_name}-asg"
-    high_alarm_name   = "${var.project_name}-high-cpu"
-    low_alarm_name    = "${var.project_name}-low-cpu"
-    target_group_arn  = aws_lb_target_group.app.arn
-    app_version       = local.app_version
+    app_bucket       = aws_s3_bucket.app.id
+    aws_region       = var.aws_region
+    asg_name         = "${var.project_name}-asg"
+    high_alarm_name  = "${var.project_name}-high-cpu"
+    low_alarm_name   = "${var.project_name}-low-cpu"
+    target_group_arn = aws_lb_target_group.app.arn
+    app_version      = local.app_version
   }))
 
   tag_specifications {
@@ -54,6 +53,9 @@ resource "aws_launch_template" "app" {
       Name = "${var.project_name}-nginx-node"
     }
   }
+
+  # Los archivos deben existir en S3 antes de que arranque una instancia
+  depends_on = [aws_s3_object.server_py, aws_s3_object.index_html]
 
   lifecycle {
     create_before_destroy = true

@@ -39,6 +39,7 @@ Cambios:
 - [x] `asg.tf`: refresh *launch-before-terminate* (`min_healthy 100%`, `max_healthy 200%`) para no quedarse sin instancias con capacidad 1.
 - [x] `app_version` (hash de `app/` + `user_data.sh`) inyectado en la instancia y expuesto en `/api/health`.
 - [x] `deploy.yml`: `fmt -check` + `validate`, espera a que el instance refresh termine y el smoke test exige que el ALB sirva solo la versión nueva.
+- [x] El código de la app (`index.html`, `server.py`) se sube a un bucket S3 privado (`terraform/app_bucket.tf`) y la instancia lo descarga al arrancar. Antes iba embebido en el user_data y, con la página nueva, superaba el límite de 16 KB de AWS (`InvalidUserData.Malformed`).
 - [x] Métricas de grupo del ASG (`GroupInServiceInstances`, gratuitas) para graficar el número de instancias.
 
 ## Fase 2 — Página Nginx mejorada (esta revisión)

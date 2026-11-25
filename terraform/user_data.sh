@@ -3,6 +3,7 @@ set -euxo pipefail
 
 dnf update -y
 dnf install -y nginx python3 gzip python3-pip
+command -v aws >/dev/null || dnf install -y awscli-2
 pip3 install --no-cache-dir boto3 || dnf install -y python3-boto3
 
 mkdir -p /opt/asg-demo
@@ -41,9 +42,15 @@ cat <<EOF > /opt/asg-demo/meta.json
 }
 EOF
 
-# Desplegar API Python y Dashboard Nginx desde app/
-echo "${server_py_gz_b64}" | base64 -d | gunzip > /opt/asg-demo/server.py
-echo "${index_html_gz_b64}" | base64 -d | gunzip > /usr/share/nginx/html/index.html
+# Descargar API Python y Dashboard Nginx desde el bucket de la app (con reintentos
+# por si el rol IAM de la instancia tarda unos segundos en estar disponible)
+for f in server.py index.html; do
+  for i in $(seq 1 10); do
+    aws s3 cp "s3://${app_bucket}/${app_version}/$f" "/opt/asg-demo/$f" --region "${aws_region}" && break
+    sleep 6
+  done
+done
+cp /opt/asg-demo/index.html /usr/share/nginx/html/index.html
 
 cat <<'EOF' > /etc/systemd/system/asg-demo-api.service
 [Unit]
