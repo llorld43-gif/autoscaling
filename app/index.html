@@ -3,360 +3,598 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AWS Auto Scaling & Load Balancing Monitor</title>
+  <title>AWS Auto Scaling Lab</title>
   <style>
     :root {
-      --bg: #0b1120;
+      --bg: #0a0f1c;
       --card: #111827;
-      --sub: #1e293b;
-      --border: #334155;
-      --text: #f8fafc;
-      --muted: #94a3b8;
+      --sub: #172033;
+      --border: #263248;
+      --text: #e8edf5;
+      --muted: #8b9ab3;
       --accent: #38bdf8;
       --green: #22c55e;
       --red: #ef4444;
       --amber: #f59e0b;
+      --violet: #a78bfa;
+      --radius: 12px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.45; }
-    .container { max-width: 1240px; margin: 0 auto; }
-    header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
-    h1 { font-size: 1.5rem; color: var(--accent); }
-    .badge { background: #0284c733; border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 999px; font-size: 0.82rem; font-weight: 600; }
-    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-bottom: 18px; }
-    .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
-    .kpi-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-    .kpi-val { font-size: 1.55rem; font-weight: 700; margin-top: 4px; }
-    .kpi-sub { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 18px; margin-bottom: 18px; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 18px; }
-    .card h2 { font-size: 1.08rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-    .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
-    .pill-ok { background: #16a34a33; color: #4ade80; border: 1px solid #22c55e; }
-    .pill-alarm { background: #ef444433; color: #f87171; border: 1px solid #ef4444; }
-    .pill-warn { background: #f59e0b33; color: #fbbf24; border: 1px solid #f59e0b; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 8px; }
-    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
-    th { color: var(--muted); font-size: 0.76rem; text-transform: uppercase; }
-    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
-    button { border: none; border-radius: 8px; padding: 10px 15px; font-size: 0.9rem; font-weight: 600; cursor: pointer; color: #fff; }
-    button:hover { opacity: 0.9; }
-    .btn-danger { background: var(--red); }
-    .btn-primary { background: #0284c7; }
-    .btn-success { background: #16a34a; }
-    .btn-secondary { background: #475569; }
-    .info { font-size: 0.85rem; color: var(--muted); }
-    .lb-bars { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
-    .lb-row { background: var(--sub); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
-    .lb-top { display: flex; justify-content: space-between; font-size: 0.86rem; font-weight: 600; margin-bottom: 5px; }
-    .track { height: 10px; background: #0b1120; border-radius: 999px; overflow: hidden; }
-    .fill { height: 100%; border-radius: 999px; transition: width 0.3s; }
-    .log-box { margin-top: 10px; background: #020617; border: 1px solid var(--border); border-radius: 8px; padding: 10px; height: 165px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 0.78rem; color: #cbd5e1; }
-    canvas { width: 100%; height: 190px; background: #020617; border: 1px solid var(--border); border-radius: 8px; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 24px 16px 40px; line-height: 1.45; }
+    .wrap { max-width: 1280px; margin: 0 auto; }
+    h1 { font-size: 1.45rem; letter-spacing: -0.01em; }
+    h2 { font-size: 1rem; margin-bottom: 4px; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+    .mono { font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
+    header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag { border: 1px solid var(--border); background: var(--sub); color: var(--muted); padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; }
+    .tag b { color: var(--text); font-weight: 600; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: middle; }
+    .dot.live { background: var(--green); box-shadow: 0 0 0 0 #22c55e88; animation: ping 1.6s infinite; }
+    .dot.err { background: var(--red); }
+    @keyframes ping { 0% { box-shadow: 0 0 0 0 #22c55e88; } 100% { box-shadow: 0 0 0 8px #22c55e00; } }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+    .grid { display: grid; gap: 16px; margin-bottom: 16px; }
+    .g-main { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+    .g-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 960px) { .g-main, .g-2 { grid-template-columns: minmax(0, 1fr); } }
+
+    /* KPIs */
+    .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+    @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .kpi { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; min-width: 0; }
+    .kpi-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .kpi-val { font-size: 1.6rem; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .kpi-sub { font-size: 0.76rem; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; }
+    .p-ok { background: #16a34a26; color: #4ade80; border: 1px solid #22c55e66; }
+    .p-alarm { background: #ef444426; color: #f87171; border: 1px solid #ef444466; }
+    .p-warn { background: #f59e0b26; color: #fbbf24; border: 1px solid #f59e0b66; }
+    .p-idle { background: #64748b26; color: #94a3b8; border: 1px solid #64748b66; }
+
+    /* Topología */
+    .topo { position: relative; margin-top: 14px; }
+    .alb { margin: 0 auto 34px; max-width: 360px; text-align: center; background: linear-gradient(180deg, #0c4a6e55, #0c4a6e22); border: 1px solid #38bdf866; border-radius: 10px; padding: 10px 14px; position: relative; }
+    .alb strong { color: var(--accent); }
+    .alb .muted { font-size: 0.75rem; }
+    .slots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    @media (max-width: 640px) { .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .slot { border: 1px dashed var(--border); border-radius: 10px; min-height: 172px; padding: 10px; display: flex; flex-direction: column; gap: 6px; position: relative; transition: border-color .3s, background .3s, transform .15s; min-width: 0; }
+    .slot.empty { align-items: center; justify-content: center; color: var(--muted); font-size: 0.78rem; text-align: center; }
+    .slot.on { border-style: solid; background: var(--sub); }
+    .slot.pending { border-color: #f59e0b88; }
+    .slot.leaving { opacity: .55; border-color: #ef444488; }
+    .slot.hit { transform: translateY(-2px); border-color: var(--accent); }
+    .slot .id { font-weight: 700; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .slot .meta { font-size: 0.72rem; color: var(--muted); }
+    .gauge { height: 8px; background: #0a0f1c; border-radius: 999px; overflow: hidden; }
+    .gauge > div { height: 100%; width: 0; border-radius: 999px; transition: width .6s, background .6s; }
+    .cpu-num { font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .slot .hits { position: absolute; top: 8px; right: 10px; font-size: 0.7rem; color: var(--accent); font-weight: 700; }
+    .slot .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .packet { position: absolute; width: 10px; height: 10px; border-radius: 50%; pointer-events: none; z-index: 3; transition: transform .55s cubic-bezier(.4,.0,.2,1), opacity .55s; box-shadow: 0 0 10px currentColor; }
+    .limits { display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.72rem; color: var(--muted); }
+
+    /* Checklist de validación */
+    .steps { list-style: none; margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .step { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; background: var(--sub); border: 1px solid transparent; }
+    .step .ico { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 0.8rem; font-weight: 700; background: #0a0f1c; color: var(--muted); border: 1px solid var(--border); }
+    .step.active { border-color: #f59e0b66; }
+    .step.active .ico { color: var(--amber); border-color: var(--amber); animation: pulse 1.2s infinite; }
+    .step.done .ico { background: var(--green); border-color: var(--green); color: #052e16; }
+    .step .t { font-size: 0.85rem; }
+    .step .d { font-size: 0.72rem; color: var(--muted); }
+    .step .when { font-size: 0.72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+    @keyframes pulse { 50% { opacity: .45; } }
+    .verdict { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 0.85rem; background: var(--sub); border: 1px solid var(--border); }
+    .verdict.ok { border-color: #22c55e88; background: #16a34a1f; color: #bbf7d0; }
+
+    /* Botones */
+    .btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 8px; }
+    button { border: 1px solid transparent; border-radius: 8px; padding: 9px 14px; font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: #fff; transition: filter .15s, opacity .15s; }
+    button:hover { filter: brightness(1.12); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .b-red { background: #dc2626; }
+    .b-blue { background: #0284c7; }
+    .b-ghost { background: transparent; border-color: var(--border); color: var(--text); }
+    .timer { font-size: 0.8rem; color: var(--amber); font-variant-numeric: tabular-nums; }
+
+    /* Balanceo */
+    .lb-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+    .lb-row .top { display: flex; justify-content: space-between; gap: 8px; font-size: 0.78rem; margin-bottom: 4px; }
+    .lb-row .top span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .track { height: 10px; background: #0a0f1c; border-radius: 999px; overflow: hidden; }
+    .fill { height: 100%; border-radius: 999px; transition: width .3s; }
+    .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+    .stat { background: var(--sub); border-radius: 8px; padding: 8px 10px; }
+    .stat b { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+    .stat span { font-size: 0.7rem; color: var(--muted); }
+
+    .log { margin-top: 10px; background: #050913; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; height: 150px; overflow-y: auto; font-family: ui-monospace, Consolas, monospace; font-size: 0.74rem; color: #c3cfe0; }
+    .log div { padding: 2px 0; border-bottom: 1px solid #ffffff08; }
+    .log .ok { color: #86efac; } .log .bad { color: #fca5a5; } .log .warn { color: #fcd34d; }
+
+    .chart-wrap { position: relative; height: 230px; margin-top: 10px; }
+    canvas { width: 100%; height: 100%; display: block; background: #050913; border: 1px solid var(--border); border-radius: 8px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.74rem; color: var(--muted); margin-top: 8px; }
+    .legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+    .error-banner { display: none; margin-bottom: 16px; padding: 10px 14px; border-radius: 8px; background: #7f1d1d55; border: 1px solid #ef444466; color: #fecaca; font-size: 0.85rem; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div>
-        <h1>🚀 AWS Auto Scaling Group &amp; Load Balancing Monitor (Nginx)</h1>
-        <p class="info" id="header-sub">Conectando con AWS Auto Scaling, CloudWatch y Application Load Balancer...</p>
-      </div>
-      <div class="badge" id="env-badge">us-east-1 · t3.micro · Min 1 / Max 4 · Capa Gratuita</div>
-    </header>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>AWS Auto Scaling Lab · Nginx + ALB</h1>
+      <p class="muted" id="sub"><span class="dot" id="live-dot"></span>Conectando con el clúster…</p>
+    </div>
+    <div class="tags">
+      <span class="tag">Región <b id="t-region">us-east-1</b></span>
+      <span class="tag">Tipo <b>t3.micro</b></span>
+      <span class="tag">Límites <b id="t-limits">1 – 4</b></span>
+      <span class="tag">Versión <b class="mono" id="t-version">–</b></span>
+    </div>
+  </header>
 
-    <div class="kpis">
-      <div class="kpi">
-        <div class="kpi-label">Instancias en Servicio</div>
-        <div class="kpi-val" id="kpi-inservice">- / 4</div>
-        <div class="kpi-sub" id="kpi-desired">Deseadas: - · Mín: 1 · Máx: 4</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Alarma Scale-Out (&ge; 50% CPU)</div>
-        <div class="kpi-val" id="kpi-high-state">-</div>
-        <div class="kpi-sub" id="kpi-high-reason">Esperando métricas (2 min)</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Alarma Scale-In (&le; 20% CPU)</div>
-        <div class="kpi-val" id="kpi-low-state">-</div>
-        <div class="kpi-sub" id="kpi-low-reason">Esperando métricas (2 min)</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Nodo Respondiendo Esta Vista</div>
-        <div class="kpi-val" style="font-size:1.1rem" id="kpi-self">-</div>
-        <div class="kpi-sub" id="kpi-self-cpu">CPU local: -%</div>
+  <div class="error-banner" id="err"></div>
+
+  <section class="kpis">
+    <div class="kpi">
+      <div class="kpi-label">Instancias InService</div>
+      <div class="kpi-val" id="k-inservice">– / 4</div>
+      <div class="kpi-sub" id="k-desired">Deseadas: –</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">CPU promedio ASG</div>
+      <div class="kpi-val" id="k-cpu">–</div>
+      <div class="kpi-sub" id="k-cpu-sub">CloudWatch, 1 min</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Alarma Scale-Out</div>
+      <div class="kpi-val" id="k-high">–</div>
+      <div class="kpi-sub" id="k-high-sub">CPU ≥ 50% · 2 min</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Alarma Scale-In</div>
+      <div class="kpi-val" id="k-low">–</div>
+      <div class="kpi-sub" id="k-low-sub">CPU ≤ 20% · 2 min</div>
+    </div>
+  </section>
+
+  <section class="grid g-main">
+    <div class="card">
+      <h2>Topología en vivo</h2>
+      <p class="muted">Cada punto es una petición HTTP que el ALB envía a una instancia. Los huecos punteados son capacidad disponible hasta el máximo.</p>
+      <div class="topo" id="topo">
+        <div class="alb" id="alb-node">
+          <strong>Application Load Balancer</strong>
+          <div class="muted">HTTP :80 · health check /api/health</div>
+        </div>
+        <div class="slots" id="slots"></div>
+        <div class="limits"><span>mín 1</span><span id="limits-max">máx 4</span></div>
       </div>
     </div>
 
     <div class="card">
-      <h2>🖥️ Instancias Lanzadas en el Auto Scaling Group (Tiempo Real)</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Instance ID</th>
-            <th>Zona (AZ)</th>
-            <th>Tipo</th>
-            <th>IP Privada</th>
-            <th>Estado ASG</th>
-            <th>Salud ALB</th>
-            <th>CPU % en Vivo</th>
-            <th>Estrés</th>
-          </tr>
-        </thead>
-        <tbody id="instances-tbody">
-          <tr><td colspan="8" class="info">Cargando instancias desde AWS...</td></tr>
-        </tbody>
-      </table>
+      <h2>Validación de alarmas</h2>
+      <p class="muted">Se marca sola con datos reales de AWS mientras corres las pruebas.</p>
+      <ol class="steps" id="steps"></ol>
+      <div class="verdict" id="verdict">Inicia la prueba de estrés para comenzar.</div>
+      <div class="btns"><button class="b-ghost" onclick="resetValidation()">Reiniciar validación</button></div>
     </div>
+  </section>
 
-    <div class="grid-2">
-      <div class="card" style="margin-bottom:0">
-        <h2>🔥 1. Prueba de Estrés CPU (Escalar 1 → 4)</h2>
-        <p class="info">
-          Envía carga de CPU (~95%+) a <strong>todas las instancias activas del ASG</strong> de forma continua.
-          Cuando el promedio supere <strong>50% por 2 min</strong>, CloudWatch escalará hasta <strong>4 instancias</strong>.
-        </p>
-        <div class="btn-row">
-          <button class="btn-danger" onclick="startClusterStress()">🔥 Iniciar Estrés en Todo el Clúster</button>
-          <button class="btn-secondary" onclick="stopClusterStress()">🛑 Detener Estrés (Escalar a 1)</button>
-        </div>
-        <p class="info" id="stress-msg">Listo para iniciar prueba de estrés.</p>
-        <h3 style="font-size:0.95rem; margin:14px 0 8px;">📈 CPU Promedio del ASG (CloudWatch 1-min)</h3>
-        <canvas id="cpu-chart" width="540" height="190"></canvas>
+  <section class="grid g-2">
+    <div class="card">
+      <h2>1 · Prueba de estrés de CPU</h2>
+      <p class="muted">Pone a ~100% de CPU todas las instancias del ASG, incluidas las que se van lanzando. Con el promedio ≥ 50% durante 2 min, la alarma suma +1 instancia hasta llegar a 4.</p>
+      <div class="btns">
+        <button class="b-red" id="btn-stress" onclick="startStress()">Iniciar estrés</button>
+        <button class="b-ghost" id="btn-stop" onclick="stopStress()" disabled>Detener estrés</button>
       </div>
-
-      <div class="card" style="margin-bottom:0">
-        <h2>⚖️ 2. Prueba Visual de Balanceo de Carga (ALB)</h2>
-        <p class="info">
-          Envía ráfagas HTTP a través del ALB y visualiza qué instancias del ASG atienden las peticiones.
-        </p>
-        <div class="btn-row">
-          <button class="btn-primary" onclick="runLoadBalanceBurst(30)">⚖️ Probar Balanceo (30 peticiones)</button>
-          <button class="btn-success" id="btn-live-lb" onclick="toggleLiveLB()">🔄 Monitor Continuo</button>
-          <button class="btn-secondary" onclick="resetLBStats()">🧹 Limpiar</button>
-        </div>
-        <div class="lb-bars" id="lb-bars">
-          <p class="info">Presiona "Probar Balanceo" para ver la distribución entre nodos.</p>
-        </div>
-        <div class="log-box" id="lb-log"></div>
+      <p class="muted" id="stress-msg">Listo.</p>
+      <p class="timer" id="stress-timer"></p>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+      <div class="legend">
+        <span><i style="background:#38bdf8"></i>CPU promedio (%)</span>
+        <span><i style="background:#a78bfa"></i>Instancias InService</span>
+        <span><i style="background:#ef4444"></i>Umbral scale-out 50%</span>
+        <span><i style="background:#22c55e"></i>Umbral scale-in 20%</span>
       </div>
     </div>
 
-    <div class="card" style="margin-top:18px">
-      <h2>📜 Historial de Eventos de Auto Scaling (AWS Scaling Activities)</h2>
-      <div class="log-box" id="activities-box" style="height:140px">Cargando eventos...</div>
+    <div class="card">
+      <h2>2 · Prueba de balanceo de carga</h2>
+      <p class="muted">Envía peticiones a <span class="mono">/api/whoami</span> a través del ALB y muestra qué instancia respondió cada una.</p>
+      <div class="btns">
+        <button class="b-blue" id="btn-burst" onclick="runBurst(40)">Enviar 40 peticiones</button>
+        <button class="b-ghost" id="btn-live" onclick="toggleLive()">Tráfico continuo</button>
+        <button class="b-ghost" onclick="resetLB()">Limpiar</button>
+      </div>
+      <div class="lb-rows" id="lb-rows"><p class="muted">Sin datos todavía.</p></div>
+      <div class="stats">
+        <div class="stat"><b id="s-total">0</b><span>peticiones</span></div>
+        <div class="stat"><b id="s-nodes">0</b><span>instancias distintas</span></div>
+        <div class="stat"><b id="s-spread">–</b><span>equilibrio (100% = perfecto)</span></div>
+      </div>
+      <div class="log" id="lb-log"></div>
     </div>
-  </div>
+  </section>
 
-  <script>
-    const PALETTE = ['#38bdf8', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6'];
-    const lbStats = {};
-    let totalLb = 0;
-    let stressLoop = null;
-    let liveLbLoop = null;
+  <section class="card">
+    <h2>Actividades del Auto Scaling Group</h2>
+    <p class="muted">Eventos reales de AWS: qué alarma disparó cada cambio de capacidad.</p>
+    <div class="log" id="acts" style="height:170px">Cargando…</div>
+  </section>
+</div>
 
-    function pillForState(state) {
-      if (state === 'ALARM') return '<span class="pill pill-alarm">ALARM</span>';
-      if (state === 'OK') return '<span class="pill pill-ok">OK</span>';
-      return `<span class="pill pill-warn">${state || 'N/A'}</span>`;
+<script>
+  const COLORS = ['#38bdf8', '#22c55e', '#f59e0b', '#a78bfa', '#f472b6', '#2dd4bf', '#fb7185', '#facc15'];
+  const colorOf = {};
+  const lb = { total: 0, by: {} };
+  let cluster = null;
+  let stressLoop = null, stressUntil = 0, liveLoop = null;
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const $ = (id) => document.getElementById(id);
+  const nowTs = () => Date.now();
+  const hhmmss = (t) => new Date(t).toLocaleTimeString('es', { hour12: false });
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  };
+  function colorFor(id) {
+    if (!colorOf[id]) colorOf[id] = COLORS[Object.keys(colorOf).length % COLORS.length];
+    return colorOf[id];
+  }
+  function pill(state) {
+    if (state === 'ALARM') return '<span class="pill p-alarm">ALARM</span>';
+    if (state === 'OK') return '<span class="pill p-ok">OK</span>';
+    return `<span class="pill p-warn">${esc(state || 'N/A')}</span>`;
+  }
+  function cpuColor(v) { return v >= 50 ? '#ef4444' : v >= 20 ? '#f59e0b' : '#22c55e'; }
+
+  /* ---------------- Validación (máquina de estados) ---------------- */
+  const STEPS = [
+    { k: 'stressAt',   t: 'Estrés iniciado',                    d: 'CPU al ~100% en todas las instancias' },
+    { k: 'highAt',     t: 'Alarma Scale-Out en ALARM',          d: 'CPU promedio ≥ 50% durante 2 min' },
+    { k: 'maxAt',      t: 'ASG en el límite superior',          d: 'Instancias InService = máximo (4)' },
+    { k: 'lbAt',       t: 'ALB reparte entre varias instancias', d: 'Peticiones respondidas por ≥ 2 nodos (ideal 4)' },
+    { k: 'stopAt',     t: 'Estrés detenido',                    d: 'La CPU vuelve a niveles bajos' },
+    { k: 'lowAt',      t: 'Alarma Scale-In en ALARM',           d: 'CPU promedio ≤ 20% durante 2 min' },
+    { k: 'minAt',      t: 'ASG de vuelta al límite inferior',   d: 'Instancias InService = mínimo (1)' },
+  ];
+  let val = store.get('asg-validation', {});
+
+  function mark(k) {
+    if (!val[k]) { val[k] = nowTs(); store.set('asg-validation', val); renderSteps(); }
+  }
+  function resetValidation() { val = {}; store.set('asg-validation', val); renderSteps(); }
+
+  function evaluate(c) {
+    const high = (c.alarms || []).find(a => /high/i.test(a.name));
+    const low = (c.alarms || []).find(a => /low/i.test(a.name));
+    const ins = c.asg.in_service_count, max = c.asg.max_size, min = c.asg.min_size;
+    if (val.stressAt && !val.stopAt) {
+      if (high && high.state === 'ALARM') mark('highAt');
+      if (ins >= max) mark('maxAt');
     }
+    if (val.stressAt && Object.keys(lb.by).length >= 2 && ins >= 2) mark('lbAt');
+    if (val.stopAt && val.maxAt) {
+      if (low && low.state === 'ALARM') mark('lowAt');
+      if (ins <= min && c.asg.desired_capacity <= min) mark('minAt');
+    }
+  }
 
-    function drawCpuChart(points) {
-      const canvas = document.getElementById('cpu-chart');
-      const ctx = canvas.getContext('2d');
-      const w = canvas.width, h = canvas.height;
-      ctx.clearRect(0, 0, w, h);
+  function renderSteps() {
+    const firstPending = STEPS.findIndex(s => !val[s.k]);
+    $('steps').innerHTML = STEPS.map((s, i) => {
+      const done = !!val[s.k];
+      const cls = done ? 'done' : (i === firstPending && val.stressAt ? 'active' : '');
+      const when = done ? (val.stressAt ? `+${Math.round((val[s.k] - val.stressAt) / 1000)}s` : hhmmss(val[s.k])) : '';
+      return `<li class="step ${cls}"><span class="ico">${done ? '✓' : i + 1}</span>
+        <div><div class="t">${s.t}</div><div class="d">${s.d}</div></div><span class="when">${when}</span></li>`;
+    }).join('');
+    const v = $('verdict');
+    if (STEPS.every(s => val[s.k])) {
+      const mins = Math.round((val.minAt - val.stressAt) / 60000);
+      v.className = 'verdict ok';
+      v.textContent = `Validación completa: las alarmas escalaron 1 → 4 → 1 en ~${mins} min y el ALB repartió el tráfico.`;
+    } else {
+      v.className = 'verdict';
+      v.textContent = !val.stressAt ? 'Inicia la prueba de estrés para comenzar.'
+        : !val.maxAt ? 'Esperando a que CloudWatch dispare la alarma y el ASG llegue a 4 (≈ 6–10 min).'
+        : !val.lbAt ? 'Con varias instancias activas, envía peticiones de balanceo.'
+        : !val.stopAt ? 'Detén el estrés para validar el escalado hacia abajo.'
+        : 'Esperando a que la alarma de scale-in reduzca el ASG a 1 (≈ 1 instancia cada 1–2 min).';
+    }
+  }
 
-      // Líneas guía 50% (rojo) y 20% (verde)
-      const y50 = h - (50 / 100) * (h - 24) - 12;
-      const y20 = h - (20 / 100) * (h - 24) - 12;
-      ctx.setLineDash([5, 5]);
-      ctx.strokeStyle = '#ef4444';
-      ctx.beginPath(); ctx.moveTo(0, y50); ctx.lineTo(w, y50); ctx.stroke();
-      ctx.strokeStyle = '#22c55e';
-      ctx.beginPath(); ctx.moveTo(0, y20); ctx.lineTo(w, y20); ctx.stroke();
-      ctx.setLineDash([]);
-
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '11px sans-serif';
-      ctx.fillText('Scale-Out 50%', 8, y50 - 4);
-      ctx.fillText('Scale-In 20%', 8, y20 - 4);
-
-      if (!points || points.length === 0) {
-        ctx.fillText('Esperando datapoints de CloudWatch...', w / 2 - 90, h / 2);
-        return;
+  /* ---------------- Topología ---------------- */
+  function renderSlots(c) {
+    const max = c.asg.max_size || 4;
+    const insts = [...(c.instances || [])].sort((a, b) => a.instance_id.localeCompare(b.instance_id));
+    const cells = [];
+    for (let i = 0; i < Math.max(max, insts.length); i++) {
+      const it = insts[i];
+      if (!it) {
+        cells.push(`<div class="slot empty">Capacidad libre<br>slot ${i + 1} de ${max}</div>`);
+        continue;
       }
+      const cpu = it.cpu_percent;
+      const life = it.lifecycle_state || '';
+      const state = life.startsWith('Terminat') ? 'leaving' : (life === 'InService' && it.target_health === 'healthy') ? '' : 'pending';
+      const health = it.target_health === 'healthy' ? '<span class="pill p-ok">healthy</span>'
+        : `<span class="pill p-warn">${esc(it.target_health)}</span>`;
+      const hits = lb.by[it.instance_id]?.count || 0;
+      cells.push(`<div class="slot on ${state}" data-id="${esc(it.instance_id)}" style="border-left:3px solid ${colorFor(it.instance_id)}">
+        ${hits ? `<span class="hits">${hits} req</span>` : ''}
+        <div class="id mono" title="${esc(it.instance_id)}">${esc(it.instance_id)}</div>
+        <div class="meta">${esc(it.az)} · ${esc(it.private_ip)}${it.is_current ? ' · <b style="color:var(--accent)">esta vista</b>' : ''}</div>
+        <div class="row"><span class="cpu-num" style="color:${cpu == null ? 'var(--muted)' : cpuColor(cpu)}">${cpu == null ? '…' : cpu + '%'}</span>
+          ${it.stress_active ? '<span class="pill p-alarm">ESTRÉS</span>' : '<span class="pill p-idle">normal</span>'}</div>
+        <div class="gauge"><div style="width:${Math.min(100, cpu || 0)}%;background:${cpuColor(cpu || 0)}"></div></div>
+        <div class="row"><span class="meta">${esc(life)}</span>${health}</div>
+      </div>`);
+    }
+    $('slots').innerHTML = cells.join('');
+    $('limits-max').textContent = `máx ${max}`;
+  }
 
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 2.5;
+  function shootPacket(id) {
+    const topo = $('topo'), alb = $('alb-node');
+    const target = topo.querySelector(`.slot[data-id="${CSS.escape(id)}"]`);
+    if (!target) return;
+    const tr = topo.getBoundingClientRect(), ar = alb.getBoundingClientRect(), sr = target.getBoundingClientRect();
+    const p = document.createElement('div');
+    p.className = 'packet';
+    const col = colorFor(id);
+    p.style.background = col; p.style.color = col;
+    const x0 = ar.left + ar.width / 2 - tr.left - 5, y0 = ar.bottom - tr.top - 5;
+    const x1 = sr.left + sr.width / 2 - tr.left - 5, y1 = sr.top - tr.top + 4;
+    p.style.left = x0 + 'px'; p.style.top = y0 + 'px';
+    topo.appendChild(p);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      p.style.transform = `translate(${x1 - x0}px, ${y1 - y0}px)`;
+    }));
+    setTimeout(() => {
+      p.style.opacity = '0';
+      target.classList.add('hit');
+      setTimeout(() => target.classList.remove('hit'), 180);
+    }, 520);
+    setTimeout(() => p.remove(), 1100);
+  }
+
+  /* ---------------- Gráfico CPU + instancias ---------------- */
+  function drawChart(c) {
+    const cv = $('chart');
+    const dpr = window.devicePixelRatio || 1;
+    const W = cv.clientWidth, H = cv.clientHeight;
+    if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const pad = { l: 34, r: 30, t: 12, b: 22 };
+    const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+    const end = Date.now() / 1000, start = end - 15 * 60;
+    const X = (ts) => pad.l + ((ts - start) / (end - start)) * pw;
+    const Yc = (v) => pad.t + ph - (Math.min(100, Math.max(0, v)) / 100) * ph;
+    const maxI = c.asg.max_size || 4;
+    const Yi = (v) => pad.t + ph - (v / maxI) * ph;
+
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.fillStyle = '#8b9ab3';
+    ctx.strokeStyle = '#ffffff10';
+    ctx.lineWidth = 1;
+    [0, 25, 50, 75, 100].forEach(v => {
+      ctx.beginPath(); ctx.moveTo(pad.l, Yc(v)); ctx.lineTo(W - pad.r, Yc(v)); ctx.stroke();
+      ctx.fillText(v + '%', 4, Yc(v) + 3);
+    });
+    for (let i = 0; i <= maxI; i++) ctx.fillText(String(i), W - pad.r + 8, Yi(i) + 3);
+    for (let m = 15; m >= 0; m -= 5) ctx.fillText(m ? `-${m}m` : 'ahora', X(end - m * 60) - (m ? 10 : 24), H - 6);
+
+    ctx.setLineDash([5, 5]);
+    [[50, '#ef4444'], [20, '#22c55e']].forEach(([v, col]) => {
+      ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(pad.l, Yc(v)); ctx.lineTo(W - pad.r, Yc(v)); ctx.stroke();
+    });
+    ctx.setLineDash([]);
+
+    const cap = c.capacity_history || [];
+    if (cap.length) {
+      ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 2;
       ctx.beginPath();
-      points.forEach((pt, idx) => {
-        const x = points.length === 1 ? w / 2 : 30 + (idx / (points.length - 1)) * (w - 60);
-        const y = h - (Math.min(100, pt.avg) / 100) * (h - 24) - 12;
-        if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      cap.forEach((p, i) => {
+        const x = X(p.ts), y = Yi(p.value);
+        if (i === 0) ctx.moveTo(x, y); else { ctx.lineTo(x, Yi(cap[i - 1].value)); ctx.lineTo(x, y); }
       });
+      ctx.lineTo(X(end), Yi(cap[cap.length - 1].value));
       ctx.stroke();
+    }
 
-      points.forEach((pt, idx) => {
-        const x = points.length === 1 ? w / 2 : 30 + (idx / (points.length - 1)) * (w - 60);
-        const y = h - (Math.min(100, pt.avg) / 100) * (h - 24) - 12;
-        ctx.fillStyle = '#38bdf8';
-        ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill();
-        if (idx === points.length - 1 || idx % 3 === 0) {
-          ctx.fillStyle = '#e2e8f0';
-          ctx.fillText(`${pt.avg}%`, x - 12, Math.max(12, y - 8));
-        }
+    const pts = c.cpu_history || [];
+    if (!pts.length) {
+      ctx.fillStyle = '#8b9ab3';
+      ctx.fillText('Esperando datapoints de CloudWatch…', pad.l + pw / 2 - 85, pad.t + ph / 2);
+      return;
+    }
+    const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ph);
+    grad.addColorStop(0, '#38bdf855'); grad.addColorStop(1, '#38bdf800');
+    ctx.beginPath();
+    pts.forEach((p, i) => { const x = X(p.ts), y = Yc(p.avg); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+    ctx.lineTo(X(pts[pts.length - 1].ts), Yc(0)); ctx.lineTo(X(pts[0].ts), Yc(0)); ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+    ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    pts.forEach((p, i) => { const x = X(p.ts), y = Yc(p.avg); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+    ctx.stroke();
+    const last = pts[pts.length - 1];
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath(); ctx.arc(X(last.ts), Yc(last.avg), 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e8edf5';
+    ctx.fillText(last.avg + '%', Math.min(X(last.ts) + 6, W - pad.r - 30), Yc(last.avg) - 6);
+  }
+
+  /* ---------------- Polling del clúster ---------------- */
+  async function refresh() {
+    try {
+      const r = await fetch(`/api/cluster?t=${Date.now()}`, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const c = await r.json();
+      cluster = c;
+      $('live-dot').className = 'dot live';
+      $('err').style.display = c.error ? 'block' : 'none';
+      if (c.error) $('err').textContent = `Error consultando AWS: ${c.error}`;
+
+      const self = (c.instances || []).find(i => i.is_current);
+      $('sub').innerHTML = `<span class="dot live" id="live-dot"></span>ASG <span class="mono">${esc(c.asg.name)}</span> · actualizado ${hhmmss(Date.now())}`;
+      $('t-region').textContent = c.region;
+      $('t-limits').textContent = `${c.asg.min_size} – ${c.asg.max_size}`;
+      if (self && self.app_version) $('t-version').textContent = self.app_version;
+
+      $('k-inservice').textContent = `${c.asg.in_service_count} / ${c.asg.max_size}`;
+      $('k-desired').textContent = `Deseadas: ${c.asg.desired_capacity} · mín ${c.asg.min_size} · máx ${c.asg.max_size}`;
+      const pts = c.cpu_history || [];
+      if (pts.length) {
+        const v = pts[pts.length - 1].avg;
+        $('k-cpu').innerHTML = `<span style="color:${cpuColor(v)}">${v}%</span>`;
+        $('k-cpu-sub').textContent = `Último minuto (${pts[pts.length - 1].time})`;
+      }
+      const high = (c.alarms || []).find(a => /high/i.test(a.name));
+      const low = (c.alarms || []).find(a => /low/i.test(a.name));
+      if (high) { $('k-high').innerHTML = pill(high.state); $('k-high-sub').textContent = `Cambió ${high.updated} · umbral ≥ ${high.threshold}%`; }
+      if (low) { $('k-low').innerHTML = pill(low.state); $('k-low-sub').textContent = `Cambió ${low.updated} · umbral ≤ ${low.threshold}%`; }
+
+      renderSlots(c);
+      drawChart(c);
+      evaluate(c);
+
+      const acts = c.activities || [];
+      $('acts').innerHTML = acts.length ? acts.map(a => {
+        const cls = /high-cpu/.test(a.cause) ? 'warn' : /low-cpu/.test(a.cause) ? 'ok' : '';
+        const why = /high-cpu/.test(a.cause) ? 'Alarma scale-out → ' : /low-cpu/.test(a.cause) ? 'Alarma scale-in → ' : '';
+        return `<div class="${cls}">[${esc(a.time)}] ${esc(a.status)} · ${why}${esc(a.description)}</div>`;
+      }).join('') : '<div>Sin actividades recientes.</div>';
+    } catch (e) {
+      $('live-dot').className = 'dot err';
+      $('err').style.display = 'block';
+      $('err').textContent = `No se pudo consultar /api/cluster (${e.message}). Reintentando…`;
+    }
+  }
+
+  /* ---------------- Estrés ---------------- */
+  async function triggerStress() {
+    try {
+      const r = await fetch('/api/stress/cluster/start', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ duration: 300 })
       });
+      const d = await r.json();
+      $('stress-msg').textContent = `Estrés activo en ${d.responded}/${d.targeted_nodes} instancias. Se reenvía cada 8 s para cubrir las nuevas.`;
+    } catch (e) {
+      $('stress-msg').textContent = 'No se pudo contactar al clúster; reintentando…';
     }
-
-    async function refreshCluster() {
-      try {
-        const [clusterRes, selfRes] = await Promise.all([
-          fetch(`/api/cluster?t=${Date.now()}`, { cache: 'no-store' }),
-          fetch(`/api/whoami?t=${Date.now()}`, { cache: 'no-store' })
-        ]);
-        const c = await clusterRes.json();
-        const s = await selfRes.json();
-
-        document.getElementById('header-sub').textContent =
-          `ASG: ${c.asg.name} · Región: ${c.region} · Última actualización: ${s.timestamp}`;
-        document.getElementById('kpi-inservice').textContent = `${c.asg.in_service_count} / ${c.asg.max_size}`;
-        document.getElementById('kpi-desired').textContent =
-          `Deseadas: ${c.asg.desired_capacity} · Mín: ${c.asg.min_size} · Máx: ${c.asg.max_size}`;
-        document.getElementById('kpi-self').textContent = s.instance_id;
-        document.getElementById('kpi-self-cpu').textContent = `CPU local: ${s.cpu_percent}% · ${s.az}`;
-
-        const high = c.alarms.find(a => a.name.includes('high'));
-        const low = c.alarms.find(a => a.name.includes('low'));
-        if (high) {
-          document.getElementById('kpi-high-state').innerHTML = pillForState(high.state);
-          document.getElementById('kpi-high-reason').textContent = high.reason.slice(0, 75);
-        }
-        if (low) {
-          document.getElementById('kpi-low-state').innerHTML = pillForState(low.state);
-          document.getElementById('kpi-low-reason').textContent = low.reason.slice(0, 75);
-        }
-
-        const tbody = document.getElementById('instances-tbody');
-        if (!c.instances || c.instances.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" class="info">No hay instancias reportadas aún.</td></tr>';
-        } else {
-          tbody.innerHTML = c.instances.map(i => `
-            <tr>
-              <td><strong>${i.instance_id}</strong> ${i.is_current ? '<span class="pill pill-ok">Vista actual</span>' : ''}</td>
-              <td>${i.az}</td>
-              <td>${i.instance_type}</td>
-              <td>${i.private_ip}</td>
-              <td>${i.lifecycle_state}</td>
-              <td>${i.target_health === 'healthy' ? '<span class="pill pill-ok">healthy</span>' : `<span class="pill pill-warn">${i.target_health}</span>`}</td>
-              <td><strong>${i.cpu_percent !== null ? i.cpu_percent + '%' : '...'}</strong></td>
-              <td>${i.stress_active ? '<span class="pill pill-alarm">ACTIVO</span>' : '<span class="pill pill-ok">Inactivo</span>'}</td>
-            </tr>
-          `).join('');
-        }
-
-        drawCpuChart(c.cpu_history);
-
-        const actBox = document.getElementById('activities-box');
-        if (c.activities && c.activities.length > 0) {
-          actBox.innerHTML = c.activities.map(a =>
-            `<div>[${a.time}] <strong>${a.status}</strong> — ${a.description}</div>`
-          ).join('');
-        }
-      } catch (e) {}
+  }
+  function startStress() {
+    if (stressLoop) clearInterval(stressLoop);
+    resetValidation();
+    mark('stressAt');
+    stressUntil = Date.now() + 25 * 60 * 1000; // salvaguarda: máximo 25 min de estrés
+    triggerStress();
+    stressLoop = setInterval(() => {
+      if (Date.now() > stressUntil) { stopStress(); return; }
+      triggerStress();
+    }, 8000);
+    $('btn-stress').disabled = true; $('btn-stop').disabled = false;
+  }
+  async function stopStress() {
+    if (stressLoop) { clearInterval(stressLoop); stressLoop = null; }
+    $('btn-stress').disabled = false; $('btn-stop').disabled = true;
+    try {
+      const r = await fetch('/api/stress/cluster/stop', { method: 'POST' });
+      const d = await r.json();
+      $('stress-msg').textContent = `Estrés detenido en ${d.responded}/${d.targeted_nodes} instancias. El ASG bajará de a 1 instancia por alarma.`;
+    } catch (e) {
+      $('stress-msg').textContent = 'Error al detener; el estrés expira solo a los 5 min.';
     }
+    if (val.stressAt) mark('stopAt');
+    refresh();
+  }
+  setInterval(() => {
+    const el = $('stress-timer');
+    if (!val.stressAt) { el.textContent = ''; return; }
+    const ref = val.minAt || Date.now();
+    const s = Math.round((ref - val.stressAt) / 1000);
+    el.textContent = `Tiempo de prueba: ${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s${val.minAt ? ' (finalizada)' : ''}`;
+  }, 1000);
 
-    function startClusterStress() {
-      if (stressLoop) clearInterval(stressLoop);
-      const trigger = async () => {
-        try {
-          const res = await fetch('/api/stress/cluster/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ duration: 300 })
-          });
-          const d = await res.json();
-          document.getElementById('stress-msg').textContent =
-            `🔥 Estrés activo en ${d.responded}/${d.targeted_nodes} instancias del ASG. Manteniendo carga para escalar hasta 4...`;
-        } catch (e) {}
-      };
-      trigger();
-      stressLoop = setInterval(trigger, 8000);
+  /* ---------------- Balanceo ---------------- */
+  function record(d) {
+    lb.total++;
+    const e = lb.by[d.instance_id] || (lb.by[d.instance_id] = { count: 0, az: d.az, ip: d.private_ip });
+    e.count++; e.cpu = d.cpu_percent;
+    shootPacket(d.instance_id);
+    const hits = document.querySelector(`.slot[data-id="${CSS.escape(d.instance_id)}"] .hits`);
+    if (hits) hits.textContent = `${e.count} req`;
+
+    const ids = Object.keys(lb.by).sort();
+    $('lb-rows').innerHTML = ids.map(id => {
+      const s = lb.by[id], pct = Math.round(s.count / lb.total * 100), col = colorFor(id);
+      return `<div class="lb-row"><div class="top"><span class="mono" style="color:${col}">${esc(id)} · ${esc(s.az)}</span>
+        <span>${s.count} · ${pct}%</span></div><div class="track"><div class="fill" style="width:${pct}%;background:${col}"></div></div></div>`;
+    }).join('');
+    $('s-total').textContent = lb.total;
+    $('s-nodes').textContent = ids.length;
+    // Equilibrio: mínimo / ideal (1 = reparto perfectamente uniforme)
+    const ideal = lb.total / ids.length;
+    const minC = Math.min(...ids.map(i => lb.by[i].count));
+    $('s-spread').textContent = ids.length > 1 ? Math.round(minC / ideal * 100) + '%' : '–';
+
+    const log = $('lb-log'), div = document.createElement('div');
+    div.innerHTML = `<span style="color:${colorFor(d.instance_id)}">●</span> #${lb.total} ${esc(d.timestamp)} → ${esc(d.instance_id)} (${esc(d.az)}) · CPU ${esc(d.cpu_percent)}%`;
+    log.prepend(div);
+    while (log.children.length > 80) log.removeChild(log.lastChild);
+    if (cluster) evaluate(cluster);
+  }
+  async function hit(i) {
+    try {
+      const r = await fetch(`/api/whoami?n=${i}_${Date.now()}`, { cache: 'no-store' });
+      record(await r.json());
+    } catch (e) {
+      const div = document.createElement('div'); div.className = 'bad';
+      div.textContent = `#${i} error: ${e.message}`; $('lb-log').prepend(div);
     }
-
-    async function stopClusterStress() {
-      if (stressLoop) { clearInterval(stressLoop); stressLoop = null; }
-      const res = await fetch('/api/stress/cluster/stop', { method: 'POST' });
-      const d = await res.json();
-      document.getElementById('stress-msg').textContent =
-        `🛑 Estrés detenido en ${d.responded}/${d.targeted_nodes} instancias. Cuando el CPU promedio baje de 20% por 2 min, escalará a 1.`;
-      refreshCluster();
+  }
+  async function runBurst(n) {
+    const btn = $('btn-burst'); btn.disabled = true;
+    // 4 peticiones concurrentes por tanda: suficiente para ver el reparto sin saturar
+    for (let i = 0; i < n; i += 4) {
+      await Promise.all([0, 1, 2, 3].filter(k => i + k < n).map(k => hit(i + k)));
+      await new Promise(r => setTimeout(r, 120));
     }
+    btn.disabled = false;
+  }
+  function toggleLive() {
+    const b = $('btn-live');
+    if (liveLoop) { clearInterval(liveLoop); liveLoop = null; b.textContent = 'Tráfico continuo'; return; }
+    b.textContent = 'Pausar tráfico';
+    liveLoop = setInterval(() => hit(lb.total + 1), 500);
+  }
+  function resetLB() {
+    lb.total = 0; lb.by = {};
+    $('lb-log').innerHTML = '';
+    $('lb-rows').innerHTML = '<p class="muted">Sin datos todavía.</p>';
+    ['s-total', 's-nodes'].forEach(id => $(id).textContent = '0');
+    $('s-spread').textContent = '–';
+    document.querySelectorAll('.slot .hits').forEach(h => h.remove());
+  }
 
-    function recordLB(d) {
-      totalLb++;
-      if (!lbStats[d.instance_id]) {
-        lbStats[d.instance_id] = { count: 0, az: d.az, ip: d.private_ip, cpu: d.cpu_percent };
-      }
-      lbStats[d.instance_id].count++;
-      lbStats[d.instance_id].cpu = d.cpu_percent;
-      const ids = Object.keys(lbStats);
-      document.getElementById('lb-bars').innerHTML = ids.map((id, idx) => {
-        const st = lbStats[id];
-        const pct = Math.round((st.count / totalLb) * 100);
-        const col = PALETTE[idx % PALETTE.length];
-        return `
-          <div class="lb-row">
-            <div class="lb-top">
-              <span style="color:${col}">${id} (${st.az} · ${st.ip})</span>
-              <span>${st.count} reqs (${pct}%) · CPU ${st.cpu}%</span>
-            </div>
-            <div class="track"><div class="fill" style="width:${pct}%;background:${col}"></div></div>
-          </div>`;
-      }).join('');
-
-      const log = document.getElementById('lb-log');
-      const div = document.createElement('div');
-      div.textContent = `[${d.timestamp}] #${totalLb} -> ${d.instance_id} (${d.az}) · CPU ${d.cpu_percent}%`;
-      log.prepend(div);
-      if (log.children.length > 60) log.removeChild(log.lastChild);
-    }
-
-    async function runLoadBalanceBurst(n) {
-      for (let i = 0; i < n; i++) {
-        try {
-          const r = await fetch(`/api/whoami?n=${i}_${Date.now()}`, { cache: 'no-store' });
-          recordLB(await r.json());
-        } catch (e) {}
-      }
-    }
-
-    function toggleLiveLB() {
-      const btn = document.getElementById('btn-live-lb');
-      if (liveLbLoop) {
-        clearInterval(liveLbLoop); liveLbLoop = null;
-        btn.textContent = '🔄 Monitor Continuo';
-      } else {
-        btn.textContent = '⏸️ Pausar Monitor';
-        liveLbLoop = setInterval(async () => {
-          try {
-            const r = await fetch(`/api/whoami?t=${Date.now()}`, { cache: 'no-store' });
-            recordLB(await r.json());
-          } catch (e) {}
-        }, 700);
-      }
-    }
-
-    function resetLBStats() {
-      for (const k of Object.keys(lbStats)) delete lbStats[k];
-      totalLb = 0;
-      document.getElementById('lb-log').innerHTML = '';
-      document.getElementById('lb-bars').innerHTML = '<p class="info">Sin datos aún.</p>';
-    }
-
-    refreshCluster();
-    setInterval(refreshCluster, 5000);
-  </script>
+  window.addEventListener('resize', () => cluster && drawChart(cluster));
+  // Si se recargó la página a mitad de prueba, permitir detener el estrés
+  if (val.stressAt && !val.stopAt) $('btn-stop').disabled = false;
+  renderSteps();
+  refresh();
+  setInterval(refresh, 5000);
+</script>
 </body>
 </html>
-HTMLEOF

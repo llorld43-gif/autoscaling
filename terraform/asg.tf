@@ -1,3 +1,13 @@
+locals {
+  # Hash del código de la app: cambia con cada modificación de app/ y se expone
+  # en /api/health para que el smoke test verifique que corre la versión nueva.
+  app_version = substr(sha1(join("", [
+    filemd5("${path.module}/../app/server.py"),
+    filemd5("${path.module}/../app/index.html"),
+    filemd5("${path.module}/user_data.sh"),
+  ])), 0, 12)
+}
+
 data "aws_ssm_parameter" "al2023_ami" {
   name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
 }
@@ -35,6 +45,7 @@ resource "aws_launch_template" "app" {
     high_alarm_name   = "${var.project_name}-high-cpu"
     low_alarm_name    = "${var.project_name}-low-cpu"
     target_group_arn  = aws_lb_target_group.app.arn
+    app_version       = local.app_version
   }))
 
   tag_specifications {
@@ -60,17 +71,29 @@ resource "aws_autoscaling_group" "app" {
   health_check_grace_period = 120
   default_cooldown          = 60
 
+  # Versión explícita (no "$Latest"): así cada cambio del launch template
+  # modifica este bloque y Terraform dispara el instance refresh.
   launch_template {
     id      = aws_launch_template.app.id
-    version = "$Latest"
+    version = aws_launch_template.app.latest_version
   }
 
+  # Lanza la instancia nueva antes de terminar la vieja (sin caída con 1 instancia)
   instance_refresh {
     strategy = "Rolling"
     preferences {
-      min_healthy_percentage = 50
+      min_healthy_percentage = 100
+      max_healthy_percentage = 200
+      instance_warmup        = 90
     }
   }
+
+  # Métricas de grupo del ASG (gratuitas) para graficar instancias en el dashboard
+  enabled_metrics = [
+    "GroupDesiredCapacity",
+    "GroupInServiceInstances",
+  ]
+  metrics_granularity = "1Minute"
 
   tag {
     key                 = "Name"

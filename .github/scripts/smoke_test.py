@@ -42,9 +42,45 @@ def check_url(name, url, check_fn, max_retries=30, delay_sec=10):
     return False
 
 
+def wait_for_version(base, expected, max_wait_sec=900, needed_streak=6):
+    """Espera hasta que TODAS las respuestas del ALB vengan de la versión nueva.
+
+    Durante un instance refresh conviven instancias viejas y nuevas; exigimos
+    varias respuestas seguidas con la versión esperada para descartar las viejas.
+    """
+    print(f"\n🔍 [PROBANDO] Versión desplegada == {expected}")
+    deadline = time.time() + max_wait_sec
+    streak = 0
+    while time.time() < deadline:
+        try:
+            req = urllib.request.Request(
+                f"{base}/api/health?t={time.time()}",
+                headers={"User-Agent": "GitHubActions-SmokeTest/1.0"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+            got = body.get("app_version")
+            if got == expected:
+                streak += 1
+                if streak >= needed_streak:
+                    print(f"   ✅ [EXITOSO] {needed_streak} respuestas seguidas con versión {expected}")
+                    return True
+            else:
+                if streak:
+                    print(f"   ⚠️ {body.get('instance_id')} aún sirve versión {got}")
+                streak = 0
+        except Exception as e:
+            streak = 0
+            print(f"   ⚠️ {e}")
+        time.sleep(3 if streak else 10)
+    print(f"   ❌ [FALLÓ] El ALB no sirvió solo la versión {expected} a tiempo.")
+    return False
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--alb-url", required=True)
+    parser.add_argument("--expected-version", default="")
     args = parser.parse_args()
     base = args.alb_url.rstrip("/")
 
@@ -55,6 +91,10 @@ def main():
         max_retries=36,
         delay_sec=10,
     )
+
+    ok_version = True
+    if args.expected_version:
+        ok_version = wait_for_version(base, args.expected_version)
 
     ok_health = check_url(
         "Health Check API",
@@ -89,7 +129,7 @@ def main():
         delay_sec=5,
     )
 
-    if ok_html and ok_health and ok_whoami and ok_cluster:
+    if ok_version and ok_html and ok_health and ok_whoami and ok_cluster:
         print("\n🎉 ¡DESPLIEGUE VERIFICADO EXITOSAMENTE!")
         sys.exit(0)
     sys.exit(1)

@@ -22,6 +22,7 @@ ASG_NAME = META.get("asg_name", "autoscaling-demo-asg")
 HIGH_ALARM = META.get("high_alarm", "autoscaling-demo-high-cpu")
 LOW_ALARM = META.get("low_alarm", "autoscaling-demo-low-cpu")
 TG_ARN = META.get("target_group_arn", "")
+APP_VERSION = META.get("app_version", "dev")
 
 cpu_percent = 0.0
 stress_lock = threading.Lock()
@@ -119,6 +120,7 @@ def get_status():
         "stress_active": active,
         "stress_remaining_sec": remaining,
         "workers": workers,
+        "app_version": APP_VERSION,
         "timestamp": time.strftime("%H:%M:%S"),
     }
 
@@ -156,6 +158,7 @@ def get_cluster_status():
         "instances": [],
         "alarms": [],
         "cpu_history": [],
+        "capacity_history": [],
         "activities": [],
         "error": None,
     }
@@ -222,6 +225,7 @@ def get_cluster_status():
                 if st:
                     item["cpu_percent"] = st.get("cpu_percent")
                     item["stress_active"] = st.get("stress_active", False)
+                    item["app_version"] = st.get("app_version")
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
             list(ex.map(_fill_node_metrics, enriched))
@@ -254,9 +258,29 @@ def get_cluster_status():
         result["cpu_history"] = [
             {
                 "time": d["Timestamp"].astimezone().strftime("%H:%M"),
+                "ts": int(d["Timestamp"].timestamp()),
                 "avg": round(d["Average"], 1),
             }
             for d in dps
+        ]
+
+        cap_resp = cw_client.get_metric_statistics(
+            Namespace="AWS/AutoScaling",
+            MetricName="GroupInServiceInstances",
+            Dimensions=[{"Name": "AutoScalingGroupName", "Value": ASG_NAME}],
+            StartTime=start_dt,
+            EndTime=end_dt,
+            Period=60,
+            Statistics=["Maximum"],
+        )
+        cap_dps = sorted(cap_resp.get("Datapoints", []), key=lambda x: x["Timestamp"])
+        result["capacity_history"] = [
+            {
+                "time": d["Timestamp"].astimezone().strftime("%H:%M"),
+                "ts": int(d["Timestamp"].timestamp()),
+                "value": int(d["Maximum"]),
+            }
+            for d in cap_dps
         ]
 
         act_resp = asg_client.describe_scaling_activities(AutoScalingGroupName=ASG_NAME, MaxRecords=8)
@@ -322,7 +346,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?")[0]
         if path == "/api/health":
-            self._send_json(200, {"status": "healthy", "instance_id": META.get("instance_id")})
+            self._send_json(200, {
+                "status": "healthy",
+                "instance_id": META.get("instance_id"),
+                "app_version": APP_VERSION,
+            })
         elif path in ("/api/whoami", "/api/stress/status"):
             self._send_json(200, get_status())
         elif path == "/api/cluster":

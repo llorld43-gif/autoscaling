@@ -4,3 +4,5 @@
 .terraform.lock.hcl
 *.tfvars
 !*.tfvars.example
+__pycache__/
+*.pyc

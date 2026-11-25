@@ -36,7 +36,8 @@ cat <<EOF > /opt/asg-demo/meta.json
   "asg_name": "${asg_name}",
   "high_alarm": "${high_alarm_name}",
   "low_alarm": "${low_alarm_name}",
-  "target_group_arn": "${target_group_arn}"
+  "target_group_arn": "${target_group_arn}",
+  "app_version": "${app_version}"
 }
 EOF
 

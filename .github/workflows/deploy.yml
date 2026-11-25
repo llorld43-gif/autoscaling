@@ -5,10 +5,20 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      run_scaling_test:
+        description: "Ejecutar validación E2E de alarmas (1 -> 4 -> 1, ~25 min)"
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
   contents: read
+
+# Evita dos despliegues simultáneos sobre el mismo estado/ASG
+concurrency:
+  group: autoscaling-deploy
+  cancel-in-progress: false
 
 env:
   AWS_REGION: "us-east-1"
@@ -22,12 +32,13 @@ jobs:
       asg_name: ${{ steps.tf_outputs.outputs.asg_name }}
       high_cpu_alarm_name: ${{ steps.tf_outputs.outputs.high_cpu_alarm_name }}
       low_cpu_alarm_name: ${{ steps.tf_outputs.outputs.low_cpu_alarm_name }}
+      app_version: ${{ steps.tf_outputs.outputs.app_version }}
     steps:
       - name: Clonar Repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Autenticación con AWS vía OIDC (Bootstrap compartido)
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Autenticación con AWS vía OIDC (Bootstrap compartido de agentes)
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
@@ -43,39 +54,102 @@ jobs:
           terraform_version: 1.7.0
           terraform_wrapper: false
 
-      - name: Inicializar Terraform
+      - name: Inicializar y Validar Terraform
+        working-directory: terraform
         run: |
-          cd terraform
-          terraform init
+          terraform init -input=false
+          terraform fmt -check -recursive
+          terraform validate
 
       - name: Aplicar Infraestructura
-        run: |
-          cd terraform
-          terraform apply -auto-approve
+        working-directory: terraform
+        run: terraform apply -auto-approve -input=false
 
       - name: Extraer Outputs
         id: tf_outputs
+        working-directory: terraform
         run: |
-          cd terraform
           echo "alb_url=$(terraform output -raw alb_url)" >> $GITHUB_OUTPUT
           echo "asg_name=$(terraform output -raw asg_name)" >> $GITHUB_OUTPUT
           echo "high_cpu_alarm_name=$(terraform output -raw high_cpu_alarm_name)" >> $GITHUB_OUTPUT
           echo "low_cpu_alarm_name=$(terraform output -raw low_cpu_alarm_name)" >> $GITHUB_OUTPUT
+          echo "app_version=$(terraform output -raw app_version)" >> $GITHUB_OUTPUT
+
+      - name: Esperar Instance Refresh del ASG (rollout de la nueva versión)
+        env:
+          ASG: ${{ steps.tf_outputs.outputs.asg_name }}
+        run: |
+          for i in $(seq 1 60); do
+            STATUS=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name "$ASG" --max-records 1 \
+              --query 'InstanceRefreshes[0].Status' --output text)
+            echo "Intento $i: instance refresh = $STATUS"
+            case "$STATUS" in
+              None|Successful|Cancelled) exit 0 ;;
+              Failed|RollbackSuccessful|RollbackFailed) echo "::error::Instance refresh $STATUS"; exit 1 ;;
+            esac
+            sleep 20
+          done
+          echo "::error::Timeout esperando el instance refresh"; exit 1
 
   verify-deployment:
-    name: 🧪 2. Smoke Test (Nginx, ALB y API de Estrés/Balanceo)
+    name: 🧪 2. Smoke Test (Versión, Nginx, ALB y API de Estrés/Balanceo)
     needs: infrastructure
     runs-on: ubuntu-latest
     steps:
       - name: Clonar Repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Configurar Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Ejecutar Smoke Tests contra el ALB
         run: |
           python .github/scripts/smoke_test.py \
-            --alb-url "${{ needs.infrastructure.outputs.alb_url }}"
+            --alb-url "${{ needs.infrastructure.outputs.alb_url }}" \
+            --expected-version "${{ needs.infrastructure.outputs.app_version }}"
+
+      - name: Resumen
+        run: |
+          echo "### ✅ Despliegue verificado" >> $GITHUB_STEP_SUMMARY
+          echo "- Dashboard: ${{ needs.infrastructure.outputs.alb_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Versión: \`${{ needs.infrastructure.outputs.app_version }}\`" >> $GITHUB_STEP_SUMMARY
+
+  scaling-e2e:
+    name: 📈 3. Validación E2E de Alarmas (1 → 4 → 1) y Balanceo
+    needs: [infrastructure, verify-deployment]
+    if: github.event_name == 'workflow_dispatch' && inputs.run_scaling_test
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Clonar Repositorio
+        uses: actions/checkout@v5
+
+      - name: Autenticación con AWS vía OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+          role-session-name: GitHubActions-AutoScaling-E2E
+
+      - name: Configurar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Ejecutar validación de escalado
+        run: |
+          python scripts/validate_scaling_e2e.py \
+            --alb-url "${{ needs.infrastructure.outputs.alb_url }}" \
+            --asg-name "${{ needs.infrastructure.outputs.asg_name }}" \
+            --high-alarm "${{ needs.infrastructure.outputs.high_cpu_alarm_name }}" \
+            --low-alarm "${{ needs.infrastructure.outputs.low_cpu_alarm_name }}" \
+            --region "${{ env.AWS_REGION }}"
+
+      - name: Detener estrés si el job falla o se cancela
+        if: failure() || cancelled()
+        run: |
+          curl -s -X POST "${{ needs.infrastructure.outputs.alb_url }}/api/stress/cluster/stop" || true

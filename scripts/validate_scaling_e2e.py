@@ -40,6 +40,25 @@ def get_alarm_state(alarm_name, region):
     return alarm["StateValue"], alarm.get("StateReason", "")
 
 
+def activities_caused_by(asg_name, alarm_name, region, since_epoch):
+    """Actividades de escalado del ASG disparadas por la alarma indicada."""
+    data = aws_json([
+        "autoscaling", "describe-scaling-activities",
+        "--auto-scaling-group-name", asg_name,
+        "--max-items", "50",
+        "--region", region,
+    ])
+    found = []
+    for act in data.get("Activities", []):
+        start = act["StartTime"]
+        # Formato ISO de la CLI: 2026-11-25T00:10:58.123000+00:00
+        from datetime import datetime
+        ts = datetime.fromisoformat(start.replace("Z", "+00:00")).timestamp()
+        if ts >= since_epoch and alarm_name in act.get("Cause", ""):
+            found.append(act)
+    return found
+
+
 def http_post(url, payload=None):
     data = json.dumps(payload or {}).encode("utf-8")
     req = urllib.request.Request(
@@ -77,8 +96,10 @@ def main():
 
     # 1. Fase Scale Out hasta max_size (4)
     print("\n🔥 [FASE 1] Iniciando estrés en todo el clúster para escalar hasta max_size=4...")
-    deadline = time.time() + args.timeout_min * 60
+    t_start = time.time()
+    deadline = t_start + args.timeout_min * 60
     scaled_max = False
+    high_fired = False
     while time.time() < deadline:
         try:
             http_post(f"{base}/api/stress/cluster/start", {"duration": 300})
@@ -86,6 +107,7 @@ def main():
             pass
         asg = get_asg_info(args.asg_name, args.region)
         high_state, _ = get_alarm_state(args.high_alarm, args.region)
+        high_fired = high_fired or high_state == "ALARM"
         in_service = [i for i in asg["Instances"] if i["LifecycleState"] == "InService"]
         print(f"   [Scale-Out] HighAlarm={high_state} | Desired={asg['DesiredCapacity']}/{asg['MaxSize']} | InService={len(in_service)}")
         if asg["DesiredCapacity"] >= asg["MaxSize"] and len(in_service) >= asg["MaxSize"]:
@@ -96,6 +118,13 @@ def main():
 
     if not scaled_max:
         print("   ❌ El ASG no alcanzó el límite superior dentro del tiempo límite.")
+        sys.exit(1)
+
+    out_acts = activities_caused_by(args.asg_name, args.high_alarm, args.region, t_start)
+    print(f"   • Alarma Scale-Out vista en ALARM: {high_fired}")
+    print(f"   • Actividades de escalado causadas por '{args.high_alarm}': {len(out_acts)}")
+    if not high_fired or not out_acts:
+        print("   ❌ El escalado no puede atribuirse a la alarma de Scale-Out.")
         sys.exit(1)
 
     # 2. Fase Balanceo de Carga entre las instancias activas
@@ -124,7 +153,8 @@ def main():
             pass
         time.sleep(2)
 
-    deadline_in = time.time() + args.timeout_min * 60
+    t_in = time.time()
+    deadline_in = t_in + args.timeout_min * 60
     scaled_in = False
     while time.time() < deadline_in:
         asg = get_asg_info(args.asg_name, args.region)
@@ -138,6 +168,12 @@ def main():
 
     if not scaled_in:
         print("   ❌ El ASG no regresó al mínimo dentro del tiempo límite.")
+        sys.exit(1)
+
+    in_acts = activities_caused_by(args.asg_name, args.low_alarm, args.region, t_in)
+    print(f"   • Actividades de escalado causadas por '{args.low_alarm}': {len(in_acts)}")
+    if not in_acts:
+        print("   ❌ La reducción no puede atribuirse a la alarma de Scale-In.")
         sys.exit(1)
 
     print("\n🎉 VALIDACIÓN E2E COMPLETA (1 -> 4 -> 1) EXITOSA.")

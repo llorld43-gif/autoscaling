@@ -36,6 +36,10 @@ autoscaling/
     └── vpc.tf
 ```
 
+## Plan de ejecución
+
+Ver [PLAN.md](PLAN.md): requisitos, fases, causa y corrección del último fallo del pipeline y notas de costos de capa gratuita.
+
 ## Validación E2E de Alarmas
 
 Una vez desplegado por GitHub Actions, puedes validar automáticamente el escalamiento hacia arriba, el balanceo y el escalamiento hacia abajo con:
@@ -43,3 +47,5 @@ Una vez desplegado por GitHub Actions, puedes validar automáticamente el escala
 ```bash
 python scripts/validate_scaling_e2e.py --alb-url http://<ALB_DNS>
 ```
+
+O desde GitHub: **Actions → Pipeline de Despliegue → Run workflow** con `run_scaling_test = true`.

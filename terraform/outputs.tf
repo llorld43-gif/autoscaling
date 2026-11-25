@@ -27,3 +27,8 @@ output "target_group_arn" {
   description = "ARN del Target Group del ALB"
   value       = aws_lb_target_group.app.arn
 }
+
+output "app_version" {
+  description = "Hash de la versión de la app desplegada (lo devuelve /api/health)"
+  value       = local.app_version
+}
