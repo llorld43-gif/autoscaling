@@ -1,0 +1,81 @@
+name: Pipeline de Despliegue AWS Auto Scaling (OIDC)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: "us-east-1"
+
+jobs:
+  infrastructure:
+    name: 🏗️ 1. Despliegue de Infraestructura (VPC, ALB, ASG, Alarmas)
+    runs-on: ubuntu-latest
+    outputs:
+      alb_url: ${{ steps.tf_outputs.outputs.alb_url }}
+      asg_name: ${{ steps.tf_outputs.outputs.asg_name }}
+      high_cpu_alarm_name: ${{ steps.tf_outputs.outputs.high_cpu_alarm_name }}
+      low_cpu_alarm_name: ${{ steps.tf_outputs.outputs.low_cpu_alarm_name }}
+    steps:
+      - name: Clonar Repositorio
+        uses: actions/checkout@v4
+
+      - name: Autenticación con AWS vía OIDC (Bootstrap compartido)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+          role-session-name: GitHubActions-AutoScaling
+
+      - name: Verificar identidad AWS
+        run: aws sts get-caller-identity
+
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+          terraform_wrapper: false
+
+      - name: Inicializar Terraform
+        run: |
+          cd terraform
+          terraform init
+
+      - name: Aplicar Infraestructura
+        run: |
+          cd terraform
+          terraform apply -auto-approve
+
+      - name: Extraer Outputs
+        id: tf_outputs
+        run: |
+          cd terraform
+          echo "alb_url=$(terraform output -raw alb_url)" >> $GITHUB_OUTPUT
+          echo "asg_name=$(terraform output -raw asg_name)" >> $GITHUB_OUTPUT
+          echo "high_cpu_alarm_name=$(terraform output -raw high_cpu_alarm_name)" >> $GITHUB_OUTPUT
+          echo "low_cpu_alarm_name=$(terraform output -raw low_cpu_alarm_name)" >> $GITHUB_OUTPUT
+
+  verify-deployment:
+    name: 🧪 2. Smoke Test (Nginx, ALB y API de Estrés/Balanceo)
+    needs: infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar Repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Ejecutar Smoke Tests contra el ALB
+        run: |
+          python .github/scripts/smoke_test.py \
+            --alb-url "${{ needs.infrastructure.outputs.alb_url }}"
